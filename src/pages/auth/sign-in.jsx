@@ -25,14 +25,42 @@ function SignIn() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (form.email === "admin@gmail.com" && form.password === "admin") {
+    try {
+      const response = await fetch('https://zenedu.everestwc.com/api/accounts/admin/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Invalid credentials');
+      }
+
+      const data = await response.json();
+      
+      // Store user data in localStorage
+      const userData = {
+        email: form.email,
+        isAuthenticated: true,
+        loginTime: new Date().toISOString(),
+        token: data.token // Store the token if the API returns one
+      };
+      localStorage.setItem('userData', JSON.stringify(userData));
+      
       toast.success("Login successful!");
       navigate("/dashboard/home");
-    } else {
-      toast.error("Invalid credentials.");
+    } catch (err) {
+      console.error('Login error:', err);
+      toast.error(err.message || "Login failed. Please try again.");
     }
   };
 

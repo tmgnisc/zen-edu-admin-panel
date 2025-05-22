@@ -16,6 +16,12 @@ export function Sidenav({ brandName, routes }) {
   const { sidenavColor, sidenavType, openSidenav } = controller;
   const navigate = useNavigate();
 
+  const handleLogout = () => {
+    // Clear user data from localStorage
+    localStorage.removeItem('userData');
+    // Navigate to login page
+    navigate("/auth/sign-in");
+  };
 
   const sidenavTypes = {
     dark: "bg-gradient-to-br from-blue-800 to-blue-900",
@@ -102,25 +108,29 @@ export function Sidenav({ brandName, routes }) {
       </div>
 
       <div className="absolute bottom-4 w-full px-4">
-  <Button
-    color="red"
-    variant="gradient"
-    fullWidth
-    onClick={() => {
-     
-      navigate("/auth/sign-in");
-    }}
-  >
-    Logout
-  </Button>
-  <Typography
-    variant="small"
-    className="mt-2 text-center text-xs font-normal text-blue-gray-300"
-  >
-   
-  </Typography>
-</div>
-
+        <Button
+          color="blue"
+          variant="gradient"
+          fullWidth
+          className="mb-2"
+          onClick={() => navigate("/dashboard/change-password")}
+        >
+          Change Password
+        </Button>
+        <Button
+          color="red"
+          variant="gradient"
+          fullWidth
+          onClick={handleLogout}
+        >
+          Logout
+        </Button>
+        <Typography
+          variant="small"
+          className="mt-2 text-center text-xs font-normal text-blue-gray-300"
+        >
+        </Typography>
+      </div>
 
     </aside>
   );
