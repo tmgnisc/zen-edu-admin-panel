@@ -140,6 +140,7 @@ function AddJob() {
       form.append('job_description', formData.jobDescription);
       form.append('recruiter_ids', JSON.stringify([1])); // Send as JSON array string
       form.append('employer_id', 1);
+      form.append('is_active', true); // Set job status to Open by default
       if (formData.companyLogo) {
         form.append('company_logo', formData.companyLogo);
       }
