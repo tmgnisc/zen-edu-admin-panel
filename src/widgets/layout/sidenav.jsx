@@ -9,17 +9,17 @@ import {
 import { useMaterialTailwindController, setOpenSidenav } from "@/context";
 import Logo from "/img/logo-ct.png"; 
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 
 export function Sidenav({ brandName, routes }) {
   const [controller, dispatch] = useMaterialTailwindController();
   const { sidenavColor, sidenavType, openSidenav } = controller;
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleLogout = () => {
-    // Clear user data from localStorage
-    localStorage.removeItem('userData');
-    // Navigate to login page
+    logout();
     navigate("/auth/sign-in");
   };
 

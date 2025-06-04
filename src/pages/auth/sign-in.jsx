@@ -12,10 +12,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Logo from "/img/logo-ct.png";
+import { useAuth } from "@/context/AuthContext";
 
 function SignIn() {
   const [form, setForm] = useState({ email: "", password: "", remember: false });
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleChange = ({ target }) => {
     const { name, value, type, checked } = target;
@@ -47,14 +49,11 @@ function SignIn() {
 
       const data = await response.json();
       
-      // Store user data in localStorage
-      const userData = {
+      // Use the login function from AuthContext
+      login({
         email: form.email,
-        isAuthenticated: true,
         loginTime: new Date().toISOString(),
-        token: data.token // Store the token if the API returns one
-      };
-      localStorage.setItem('userData', JSON.stringify(userData));
+      }, data.token);
       
       toast.success("Login successful!");
       navigate("/dashboard/home");

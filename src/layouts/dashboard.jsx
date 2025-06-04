@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Cog6ToothIcon } from "@heroicons/react/24/solid";
 import { IconButton } from "@material-tailwind/react";
 import {
@@ -9,10 +9,29 @@ import {
 } from "@/widgets/layout";
 import routes from "@/routes";
 import { useMaterialTailwindController, setOpenConfigurator } from "@/context";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function Dashboard() {
   const [controller, dispatch] = useMaterialTailwindController();
   const { sidenavType } = controller;
+  const { isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate('/auth/sign-in');
+    }
+  }, [isAuthenticated, loading, navigate]);
+
+  if (loading) {
+    return <div>Loading...</div>; // You can replace this with a proper loading component
+  }
+
+  if (!isAuthenticated) {
+    return null; // Don't render anything while redirecting
+  }
 
   return (
     <div className="min-h-screen bg-blue-50/50">
@@ -39,9 +58,10 @@ export function Dashboard() {
             ({ layout, pages }) =>
               layout === "dashboard" &&
               pages.map(({ path, element }) => (
-                <Route exact path={path} element={element} />
+                <Route key={path} exact path={path} element={element} />
               ))
           )}
+          <Route path="*" element={<Navigate to="/dashboard/home" replace />} />
         </Routes>
         <div className="text-blue-600">
           <Footer />
