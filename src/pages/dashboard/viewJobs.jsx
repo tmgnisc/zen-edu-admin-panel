@@ -22,6 +22,7 @@ import {
   Select,
   Option,
   Textarea,
+  Checkbox,
 } from "@material-tailwind/react";
 import { EllipsisVerticalIcon } from "@heroicons/react/24/outline";
 import {
@@ -36,6 +37,7 @@ import {
 
 function ViewJobs() {
   const [jobs, setJobs] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showToast, setShowToast] = useState(false);
@@ -45,13 +47,27 @@ function ViewJobs() {
   const [editFormData, setEditFormData] = useState({
     job_title: "",
     job_description: "",
-    salary_range: "",
-    job_type: "",
+    salaryMin: "",
+    salaryMax: "",
+    currency: "AED",
+    job_schedule: "",
+    job_category_id: "",
+    job_location: "",
     number_of_people: "",
     resume_required: true,
-    cover_letter_required: true,
+    cover_letter_required: false,
     deadline: "",
     screening_questions: "",
+    benefits: {
+      accommodation: false,
+      bonus: false,
+      transportation: false,
+      food_allowance: false,
+      incentive: false,
+      others: "",
+    },
+    featured: false,
+    company_logo: null,
   });
 
   const showToastMessage = (message, type = "success") => {
@@ -62,6 +78,7 @@ function ViewJobs() {
 
   useEffect(() => {
     fetchJobs();
+    fetchCategories();
   }, []);
 
   const fetchJobs = async () => {
@@ -81,18 +98,45 @@ function ViewJobs() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('https://zenedu.everestwc.com/api/job-categories/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      const data = await response.json();
+      setCategories(data);
+    } catch (err) {
+      console.error("Failed to fetch categories:", err);
+    }
+  };
+
   const handleEdit = (job) => {
     setEditingJob(job);
+    
+    // Parse salary_range
+    const salaryMatch = job.salary_range.match(/(\d+)-(\d+)\s(.+)/);
+    const salaryMin = salaryMatch ? salaryMatch[1] : "";
+    const salaryMax = salaryMatch ? salaryMatch[2] : "";
+    const currency = salaryMatch ? salaryMatch[3] : "AED";
+
     setEditFormData({
       job_title: job.job_title,
       job_description: job.job_description,
-      salary_range: job.salary_range,
-      job_type: job.job_type,
+      salaryMin,
+      salaryMax,
+      currency,
+      job_schedule: job.job_schedule,
+      job_category_id: job.job_category.id.toString(),
+      job_location: job.job_location,
       number_of_people: job.number_of_people,
       resume_required: job.resume_required,
       cover_letter_required: job.cover_letter_required,
       deadline: job.deadline.split('T')[0],
-      screening_questions: job.screening_questions,
+      screening_questions: job.screening_questions || "",
+      benefits: job.benefits || { accommodation: false, bonus: false, transportation: false, food_allowance: false, incentive: false, others: "" },
+      featured: job.featured,
+      company_logo: null, // Reset logo on each edit
     });
     setEditModalOpen(true);
   };
@@ -105,15 +149,42 @@ function ViewJobs() {
     }));
   };
 
+  const handleEditBenefitsChange = (benefit, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      benefits: {
+        ...prev.benefits,
+        [benefit]: value
+      }
+    }));
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
+    
+    const form = new FormData();
+    form.append('job_title', editFormData.job_title);
+    form.append('job_description', editFormData.job_description);
+    form.append('salary_range', `${editFormData.salaryMin}-${editFormData.salaryMax} ${editFormData.currency}`);
+    form.append('job_schedule', editFormData.job_schedule);
+    form.append('job_category', editFormData.job_category_id);
+    form.append('job_location', editFormData.job_location);
+    form.append('number_of_people', editFormData.number_of_people);
+    form.append('resume_required', editFormData.resume_required);
+    form.append('cover_letter_required', editFormData.cover_letter_required);
+    form.append('deadline', editFormData.deadline);
+    form.append('screening_questions', editFormData.screening_questions);
+    form.append('benefits', JSON.stringify(editFormData.benefits));
+    form.append('featured', editFormData.featured);
+
+    if (editFormData.company_logo) {
+      form.append('company_logo', editFormData.company_logo);
+    }
+
     try {
       const response = await fetch(`https://zenedu.everestwc.com/api/jobs/${editingJob.id}/`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editFormData),
+        body: form,
       });
 
       if (!response.ok) {
@@ -358,8 +429,8 @@ function ViewJobs() {
       <Dialog open={editModalOpen} handler={() => setEditModalOpen(false)} size="lg">
         <DialogHeader>Edit Job</DialogHeader>
         <form onSubmit={handleEditSubmit}>
-          <DialogBody>
-            <div className="grid gap-4">
+          <DialogBody divider className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[75vh] overflow-y-auto p-6">
+            
               <Input
                 label="Job Title"
                 name="job_title"
@@ -367,34 +438,84 @@ function ViewJobs() {
                 onChange={handleEditChange}
                 required
               />
-              <Textarea
-                label="Job Description"
-                name="job_description"
-                value={editFormData.job_description}
+
+              <div className="md:col-span-2">
+                <Typography variant="small" className="mb-2 font-medium text-blue-gray-600">Job Description</Typography>
+                <Textarea
+                  name="job_description"
+                  value={editFormData.job_description}
+                  onChange={handleEditChange}
+                  required
+                />
+              </div>
+
+              <Input
+                label="Min Salary"
+                name="salaryMin"
+                type="number"
+                value={editFormData.salaryMin}
                 onChange={handleEditChange}
                 required
               />
               <Input
-                label="Salary Range"
-                name="salary_range"
-                value={editFormData.salary_range}
+                label="Max Salary"
+                name="salaryMax"
+                type="number"
+                value={editFormData.salaryMax}
                 onChange={handleEditChange}
                 required
               />
               <Select
-                label="Job Type"
-                name="job_type"
-                value={editFormData.job_type}
-                onChange={(value) => setEditFormData(prev => ({ ...prev, job_type: value }))}
+                label="Currency"
+                name="currency"
+                value={editFormData.currency}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, currency: value }))}
+              >
+                <Option value="USD">USD</Option>
+                <Option value="EUR">EUR</Option>
+                <Option value="GBP">GBP</Option>
+                <Option value="AED">AED</Option>
+                <Option value="NRs">NRs</Option>
+              </Select>
+              
+              <Select
+                label="Job Category"
+                name="job_category_id"
+                value={editFormData.job_category_id}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, job_category_id: value }))}
+                required
+              >
+                {categories.map(cat => <Option key={cat.id} value={cat.id.toString()}>{cat.name}</Option>)}
+              </Select>
+
+              <Select
+                label="Job Schedule"
+                name="job_schedule"
+                value={editFormData.job_schedule}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, job_schedule: value }))}
                 required
               >
                 <Option value="full_time">Full Time</Option>
                 <Option value="part_time">Part Time</Option>
                 <Option value="contract">Contract</Option>
                 <Option value="internship">Internship</Option>
+                <Option value="freelance">Freelance</Option>
               </Select>
+              
+              <Select
+                label="Job Location"
+                name="job_location"
+                value={editFormData.job_location}
+                onChange={(value) => setEditFormData(prev => ({ ...prev, job_location: value }))}
+                required
+              >
+                <Option value="onsite">On-Site</Option>
+                <Option value="remote">Remote</Option>
+                <Option value="hybrid">Hybrid</Option>
+              </Select>
+
               <Input
-                label="Number of People"
+                label="Number of People to Hire"
                 name="number_of_people"
                 type="number"
                 value={editFormData.number_of_people}
@@ -402,46 +523,49 @@ function ViewJobs() {
                 required
               />
               <Input
-                label="Deadline"
+                label="Application Deadline"
                 name="deadline"
                 type="date"
                 value={editFormData.deadline}
                 onChange={handleEditChange}
                 required
               />
-              <Textarea
-                label="Screening Questions"
-                name="screening_questions"
-                value={editFormData.screening_questions}
-                onChange={handleEditChange}
-              />
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="resume_required"
-                    checked={editFormData.resume_required}
-                    onChange={handleEditChange}
-                    className="rounded border-blue-gray-200 text-blue-500 focus:ring-blue-500"
-                  />
-                  <Typography variant="small" className="font-medium text-blue-gray-700">
-                    Resume Required
-                  </Typography>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="cover_letter_required"
-                    checked={editFormData.cover_letter_required}
-                    onChange={handleEditChange}
-                    className="rounded border-blue-gray-200 text-blue-500 focus:ring-blue-500"
-                  />
-                  <Typography variant="small" className="font-medium text-blue-gray-700">
-                    Cover Letter Required
-                  </Typography>
+
+              <div className="md:col-span-2">
+                <Typography variant="small" className="mb-2 font-medium text-blue-gray-600">Screening Questions</Typography>
+                <Textarea
+                  name="screening_questions"
+                  value={editFormData.screening_questions}
+                  onChange={handleEditChange}
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <Typography variant="h6" color="blue-gray" className="mb-2">Benefits</Typography>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <Checkbox label="Accommodation" checked={editFormData.benefits.accommodation} onChange={(e) => handleEditBenefitsChange('accommodation', e.target.checked)} />
+                  <Checkbox label="Bonus" checked={editFormData.benefits.bonus} onChange={(e) => handleEditBenefitsChange('bonus', e.target.checked)} />
+                  <Checkbox label="Transportation" checked={editFormData.benefits.transportation} onChange={(e) => handleEditBenefitsChange('transportation', e.target.checked)} />
+                  <Checkbox label="Food Allowance" checked={editFormData.benefits.food_allowance} onChange={(e) => handleEditBenefitsChange('food_allowance', e.target.checked)} />
+                  <Checkbox label="Incentive" checked={editFormData.benefits.incentive} onChange={(e) => handleEditBenefitsChange('incentive', e.target.checked)} />
                 </div>
               </div>
-            </div>
+
+              <div className="md:col-span-2">
+                <Input label="Other Benefits" name="others" value={editFormData.benefits.others} onChange={(e) => handleEditBenefitsChange('others', e.target.value)} />
+              </div>
+
+              <div className="md:col-span-2 flex flex-wrap items-center gap-6">
+                <Checkbox label="Resume Required" name="resume_required" checked={editFormData.resume_required} onChange={handleEditChange} />
+                <Checkbox label="Cover Letter Required" name="cover_letter_required" checked={editFormData.cover_letter_required} onChange={handleEditChange} />
+                <Checkbox label="Featured Job" name="featured" checked={editFormData.featured} onChange={handleEditChange} />
+              </div>
+              
+              <div className="md:col-span-2">
+                <Typography variant="small" className="mb-2 font-medium text-blue-gray-600">Company Logo</Typography>
+                <Input type="file" name="company_logo" onChange={(e) => setEditFormData(prev => ({ ...prev, company_logo: e.target.files[0] }))} />
+              </div>
+
           </DialogBody>
           <DialogFooter>
             <Button

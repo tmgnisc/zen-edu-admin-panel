@@ -37,6 +37,7 @@ const jobTypeOptions = [
 
 function AddJob() {
   const [companies, setCompanies] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState(null);
@@ -45,7 +46,8 @@ function AddJob() {
     company: "",
     jobTitle: "",
     numberOfHires: "",
-    jobType: "",
+    applications: "",
+    jobCategory: "",
     salaryMin: "",
     salaryMax: "",
     currency: "AED",
@@ -56,6 +58,17 @@ function AddJob() {
     deadline: "",
     screeningQuestions: "",
     companyLogo: null,
+    benefits: {
+      accommodation: false,
+      bonus: false,
+      transportation: false,
+      food_allowance: false,
+      incentive: false,
+      others: ""
+    },
+    featured: false,
+    jobLocation: "",
+    jobSchedule: "",
   });
 
   const [showToast, setShowToast] = useState(false);
@@ -63,6 +76,7 @@ function AddJob() {
 
   useEffect(() => {
     fetchCompanies();
+    fetchCategories();
   }, []);
 
   const fetchCompanies = async () => {
@@ -75,6 +89,21 @@ function AddJob() {
       const data = await response.json();
       setCompanies(data);
       setError(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('https://zenedu.everestwc.com/api/job-categories/');
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
+      const data = await response.json();
+      setCategories(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -105,11 +134,21 @@ function AddJob() {
     setTimeout(() => setShowToast(false), 3000); // Hide after 3 seconds
   };
 
+  const handleBenefitsChange = (benefit, value) => {
+    setFormData(prev => ({
+      ...prev,
+      benefits: {
+        ...prev.benefits,
+        [benefit]: value
+      }
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     // Validation
-    if (!formData.jobTitle || !formData.company || !formData.jobType || !formData.salaryMin || !formData.salaryMax || !formData.deadline || !formData.jobDescription) {
+    if (!formData.jobTitle || !formData.company || !formData.jobSchedule || !formData.jobCategory || !formData.salaryMin || !formData.salaryMax || !formData.deadline || !formData.jobDescription || !formData.jobLocation) {
       showToastMessage("Please fill all required fields.", "error");
       setLoading(false);
       return;
@@ -119,8 +158,13 @@ function AddJob() {
       setLoading(false);
       return;
     }
-    if (!formData.jobType) {
-      showToastMessage("Please select a job type.", "error");
+    if (!formData.jobSchedule) {
+      showToastMessage("Please select a job schedule.", "error");
+      setLoading(false);
+      return;
+    }
+    if (!formData.jobCategory) {
+      showToastMessage("Please select a job category.", "error");
       setLoading(false);
       return;
     }
@@ -129,46 +173,55 @@ function AddJob() {
       form.append('job_title', formData.jobTitle);
       form.append('company_id', formData.company);
       form.append('salary_range', `${formData.salaryMin}-${formData.salaryMax} ${formData.currency}`);
-      form.append('applications', 0);
-      form.append('job_category_id', 2);
-      form.append('job_type', formData.jobType);
+      form.append('applications', formData.applications);
+      form.append('job_category_id', formData.jobCategory);
       form.append('number_of_people', formData.numberOfHires);
       form.append('resume_required', formData.resumeRequired);
       form.append('cover_letter_required', formData.coverLetterRequired);
       form.append('deadline', formData.deadline);
       form.append('screening_questions', formData.screeningQuestions || '');
       form.append('job_description', formData.jobDescription);
-      form.append('recruiter_ids', JSON.stringify([1])); // Send as JSON array string
-      form.append('employer_id', 1);
-      form.append('is_active', true); // Set job status to Open by default
+      form.append('is_active', true); // Keep job active by default
+      form.append('benefits', JSON.stringify(formData.benefits));
+      form.append('featured', formData.featured);
+      form.append('job_location', formData.jobLocation);
+      form.append('job_schedule', formData.jobSchedule);
+      
       if (formData.companyLogo) {
         form.append('company_logo', formData.companyLogo);
       }
-      for (let pair of form.entries()) {
-        console.log(pair[0]+ ': ' + pair[1]);
-      }
+      
       const response = await fetch('https://zenedu.everestwc.com/api/jobs/', {
         method: 'POST',
         body: form,
       });
+
       if (!response.ok) {
         let errorMsg = 'Failed to create job';
         try {
           const errorData = await response.json();
-          if (errorData && errorData.error) {
-            errorMsg = errorData.error;
+          // Log the full error from backend for better debugging
+          console.error("Backend error:", errorData);
+          if (errorData && typeof errorData === 'object') {
+            // Display first error message from the backend response object
+            const firstErrorKey = Object.keys(errorData)[0];
+            errorMsg = `${firstErrorKey}: ${errorData[firstErrorKey]}`;
           } else if (typeof errorData === 'string') {
             errorMsg = errorData;
           }
-        } catch (e) {}
+        } catch (e) {
+          errorMsg = response.statusText;
+        }
         throw new Error(errorMsg);
       }
+
       showToastMessage("Job added successfully!", "success");
       setFormData({
         company: "",
         jobTitle: "",
         numberOfHires: "",
-        jobType: "",
+        applications: "",
+        jobCategory: "",
         salaryMin: "",
         salaryMax: "",
         currency: "AED",
@@ -179,6 +232,17 @@ function AddJob() {
         deadline: "",
         screeningQuestions: "",
         companyLogo: null,
+        benefits: {
+          accommodation: false,
+          bonus: false,
+          transportation: false,
+          food_allowance: false,
+          incentive: false,
+          others: ""
+        },
+        featured: false,
+        jobLocation: "",
+        jobSchedule: "",
       });
       setSelectedCompany(null);
     } catch (err) {
@@ -297,17 +361,26 @@ function AddJob() {
               required
             />
 
+            <Input
+              label="Number of Openings (Applications)"
+              name="applications"
+              type="number"
+              value={formData.applications}
+              onChange={handleChange}
+              required
+            />
+
             <div className="col-span-1">
               <Select
-                label="Job Type"
-                name="jobType"
-                value={formData.jobType}
-                onChange={(value) => setFormData(prev => ({ ...prev, jobType: value }))}
+                label="Job Category"
+                name="jobCategory"
+                value={formData.jobCategory}
+                onChange={(value) => setFormData(prev => ({ ...prev, jobCategory: value }))}
                 required
               >
-                {jobTypeOptions.map((type) => (
-                  <Option key={type} value={type.toLowerCase().replace(' ', '_')}>
-                    {type}
+                {categories.map((category) => (
+                  <Option key={category.id} value={category.id.toString()}>
+                    {category.name}
                   </Option>
                 ))}
               </Select>
@@ -428,6 +501,98 @@ function AddJob() {
                 accept="image/*"
                 onChange={e => setFormData(prev => ({ ...prev, companyLogo: e.target.files[0] }))}
                 className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+
+            {/* Job Location and Schedule Section */}
+            <div className="col-span-1 md:col-span-2">
+              <Typography variant="h6" color="blue-gray" className="mb-4 mt-4">
+                Job Location and Schedule
+              </Typography>
+            </div>
+
+            <div className="col-span-1">
+              <Select
+                label="Job Location"
+                name="jobLocation"
+                value={formData.jobLocation}
+                onChange={(value) => setFormData(prev => ({ ...prev, jobLocation: value }))}
+                required
+              >
+                <Option value="remote">Remote</Option>
+                <Option value="onsite">On-Site</Option>
+                <Option value="hybrid">Hybrid</Option>
+              </Select>
+            </div>
+
+            <div className="col-span-1">
+              <Select
+                label="Job Schedule"
+                name="jobSchedule"
+                value={formData.jobSchedule}
+                onChange={(value) => setFormData(prev => ({ ...prev, jobSchedule: value }))}
+                required
+              >
+                <Option value="full_time">Full Time</Option>
+                <Option value="part_time">Part Time</Option>
+                <Option value="contract">Contract</Option>
+                <Option value="internship">Internship</Option>
+                <Option value="freelance">Freelance</Option>
+              </Select>
+            </div>
+
+            {/* Benefits and Features Section */}
+            <div className="col-span-1 md:col-span-2">
+              <Typography variant="h6" color="blue-gray" className="mb-4 mt-4">
+                Benefits & Features
+              </Typography>
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <Checkbox
+                  label="Accommodation"
+                  checked={formData.benefits.accommodation}
+                  onChange={(e) => handleBenefitsChange('accommodation', e.target.checked)}
+                />
+                <Checkbox
+                  label="Bonus"
+                  checked={formData.benefits.bonus}
+                  onChange={(e) => handleBenefitsChange('bonus', e.target.checked)}
+                />
+                <Checkbox
+                  label="Transportation"
+                  checked={formData.benefits.transportation}
+                  onChange={(e) => handleBenefitsChange('transportation', e.target.checked)}
+                />
+                <Checkbox
+                  label="Food Allowance"
+                  checked={formData.benefits.food_allowance}
+                  onChange={(e) => handleBenefitsChange('food_allowance', e.target.checked)}
+                />
+                <Checkbox
+                  label="Incentive"
+                  checked={formData.benefits.incentive}
+                  onChange={(e) => handleBenefitsChange('incentive', e.target.checked)}
+                />
+              </div>
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <Checkbox
+                label="Featured Job"
+                checked={formData.featured}
+                onChange={(e) => setFormData(prev => ({ ...prev, featured: e.target.checked }))}
+              />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <Input
+                label="Other Benefits"
+                name="otherBenefits"
+                value={formData.benefits.others}
+                onChange={(e) => handleBenefitsChange('others', e.target.value)}
+                placeholder="e.g., Health insurance, gym membership"
               />
             </div>
 
