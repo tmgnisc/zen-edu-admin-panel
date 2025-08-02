@@ -19,8 +19,9 @@ import {
   DialogFooter,
   Button,
 } from "@material-tailwind/react";
-import { EllipsisVerticalIcon, EyeIcon } from "@heroicons/react/24/outline";
+import { EllipsisVerticalIcon, EyeIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
+import * as XLSX from 'xlsx';
 
 export function Tables() {
   const [applications, setApplications] = useState([]);
@@ -29,6 +30,7 @@ export function Tables() {
   const [updatingId, setUpdatingId] = useState(null);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     fetchApplications();
@@ -81,6 +83,79 @@ export function Tables() {
   const handleViewProfile = (application) => {
     setSelectedApplicant(application);
     setProfileModalOpen(true);
+  };
+
+  const downloadExcel = async () => {
+    try {
+      setDownloading(true);
+      
+      // Prepare data for Excel
+      const excelData = applications.map(application => ({
+        'Application ID': application.id,
+        'Full Name': application.applicant.full_name || 'Not provided',
+        'Username': application.applicant.username,
+        'Email': application.applicant.email,
+        'Phone Number': application.applicant.phone_number || 'Not provided',
+        'Gender': application.applicant.gender || 'Not provided',
+        'Marital Status': application.applicant.marital_status || 'Not provided',
+        'Nationality': application.applicant.nationality || 'Not provided',
+        'Current Location': application.applicant.current_location || 'Not provided',
+        'Preferred Job Location': application.applicant.preferred_job_location || 'Not provided',
+        'Languages': application.applicant.languages || 'Not provided',
+        'Driving License': application.applicant.driving_license || 'Not provided',
+        'Visa Status': application.applicant.visa_status || 'Not provided',
+        'Passport Expiry Date': application.applicant.passport_expiry_date ? new Date(application.applicant.passport_expiry_date).toLocaleDateString() : 'Not provided',
+        'Highest Qualification': application.applicant.highest_qualification || 'Not provided',
+        'Years of Experience': application.applicant.years_of_experience || 'Not provided',
+        'Expected Salary': application.applicant.expected_salary && application.applicant.currency 
+          ? `${application.applicant.expected_salary} ${application.applicant.currency}`
+          : (application.applicant.expected_salary || 'Not provided'),
+        'Preferred Designation': application.applicant.preferred_designation || 'Not provided',
+        'Availability to Join': application.applicant.availability_to_join || 'Not provided',
+        'LinkedIn URL': application.applicant.linkedin_url || 'Not provided',
+        'Certificate': application.applicant.certificate || 'Not provided',
+        'Verification Status': application.applicant.is_verified ? 'Verified' : 'Not Verified',
+        'Education Details': application.applicant.education_details || 'Not provided',
+        'Past Employment Details': application.applicant.past_employment_details || 'Not provided',
+        'Applied Position': application.job.job_title,
+        'Company': application.job.company.name,
+        'Salary Range': application.job.salary_range,
+        'Job Location': application.job.job_location,
+        'Job Schedule': application.job.job_schedule,
+        'Applied Date': new Date(application.applied_at).toLocaleDateString(),
+        'Application Status': application.status,
+        'Resume URL': application.resume || 'Not provided',
+        'Cover Letter URL': application.cover_letter || 'Not provided',
+        'Profile Picture URL': application.applicant.profile_picture || 'Not provided',
+      }));
+
+      // Create workbook and worksheet
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // Auto-size columns
+      const columnWidths = Object.keys(excelData[0] || {}).map(key => ({
+        wch: Math.max(key.length, 20)
+      }));
+      worksheet['!cols'] = columnWidths;
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Applications');
+
+      // Generate filename with current date
+      const currentDate = new Date().toISOString().split('T')[0];
+      const filename = `applications_${currentDate}.xlsx`;
+
+      // Download the file
+      XLSX.writeFile(workbook, filename);
+      
+      toast.success('Excel file downloaded successfully!');
+    } catch (err) {
+      console.error('Error downloading Excel:', err);
+      toast.error('Failed to download Excel file');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -136,9 +211,26 @@ export function Tables() {
     <div className="mt-12 mb-8">
       <Card className="border border-blue-gray-100 shadow-sm">
         <CardHeader variant="gradient" color="gray" className="mb-8 p-6">
-          <Typography variant="h6" color="white">
-            Applications
-          </Typography>
+          <div className="flex justify-between items-center">
+            <Typography variant="h6" color="white">
+              Applications
+            </Typography>
+            <Button
+              size="sm"
+              color="white"
+              variant="outlined"
+              onClick={downloadExcel}
+              disabled={downloading || applications.length === 0}
+              className="flex items-center gap-2"
+            >
+              {downloading ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <ArrowDownTrayIcon className="h-4 w-4" />
+              )}
+              Download Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardBody className="overflow-x-scroll px-0 pt-0 pb-2">
           <table className="w-full min-w-[640px] table-auto">
